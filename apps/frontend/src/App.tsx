@@ -1,28 +1,43 @@
-import { createClient } from "@supabase/supabase-js"
-import { useEffect, useState } from "react"
-
-const supabase = createClient("https://yokvffsxhwzrrdbjoxja.supabase.co","sb_publishable_gB8RnnIOCEJdhzoS10Xblw_0i-WoTDO")
+import { useSupabase } from "./hooks/useSupabase";
+import { useUser } from "./hooks/useUser";
 
 const App = () => {
 
-  const [claims, setClaims] = useState(null);
-
-  useEffect(() => {
-    
-  }, [])
+  const { user } = useUser();
+  const supabase = useSupabase();
 
   return (
     <div>
-      <button onClick={async () => {
-        await supabase.auth.signInWithWeb3({
-          chain: 'solana',
-          statement: 'I confirm I want to Sign in to Prediction Market',
-        })
-      }}>
-        Sign in with Solana
-      </button>
-    </div>
-  )
-}
 
-export default App
+      {!user && (
+        <button onClick={async () => {
+
+          await supabase.auth.signInWithWeb3({
+            chain: 'solana',
+            statement: 'I confirm I want to Sign in to Prediction Market',
+          });
+
+        }}>
+          Sign in with Solana
+        </button>
+      )}
+
+      {user && (
+        <button onClick={async () => {
+
+          await supabase.auth.signOut();
+
+        }}>
+          Logout
+        </button>
+      )}
+
+      <pre>
+        {JSON.stringify(user, null, 2)}
+      </pre>
+
+    </div>
+  );
+};
+
+export default App;
