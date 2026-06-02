@@ -44,8 +44,6 @@ const App = () => {
 
           const token = r.data.session.access_token;
 
-          console.log(token);
-
           const response = await axios.post(
             "http://localhost:3000/buy",
             {},
