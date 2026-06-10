@@ -10,8 +10,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-console.log(process.env.DATABASE_URL);
-
 function parseOrderbook(orderbook: unknown): Orderbook {
     if (typeof orderbook === "string") {
         return JSON.parse(orderbook);
@@ -79,7 +77,10 @@ app.post("/order", middleware, async (req, res) => {
                     for (const order of orders) {
                         if (leftQty <= 0) break;
                         
-                        const matchedQty = order.qty >= leftQty ? leftQty : order.qty;
+                         const remainingInOrder = order.qty - order.filledQty;
+                        if (remainingInOrder <= 0) continue; // Skip fully filled orders
+                        
+                        const matchedQty = remainingInOrder >= leftQty ? leftQty : remainingInOrder;
                         const reverseOrder = order.reverseOrder;
                         if (!reverseOrder) {
                             await tx.positions.update({
@@ -548,6 +549,16 @@ app.post("/order", middleware, async (req, res) => {
                 }
             }
 
+            // Clean up fully filled orders
+            for (const price of Object.keys(yesOrderbook)) {
+                yesOrderbook[price]!.orders = yesOrderbook[price]!.orders.filter(o => o.filledQty < o.qty);
+                if (yesOrderbook[price]!.orders.length === 0) delete yesOrderbook[price];
+            }
+            for (const price of Object.keys(noOrderbook)) {
+                noOrderbook[price]!.orders = noOrderbook[price]!.orders.filter(o => o.filledQty < o.qty);
+                if (noOrderbook[price]!.orders.length === 0) delete noOrderbook[price];
+            }
+
             await tx.orderHistory.create({
                 data: {
                     id: originalOrderId,
@@ -610,85 +621,98 @@ app.post("/split", middleware, async (req, res) => {
     }
     const marketId = data?.marketId;
 
-    await prisma.$transaction(async tx => {
-        const userResponse = await tx.$queryRaw<{id: string, address: string, usdBalance: number}[]>`SELECT * FROM "User" WHERE id=${userId} FOR UPDATE;`;
-        const user = userResponse[0];
-        if (!user) {
-            throw new Error("User not found");
-        }
-        
-        if (user.usdBalance < data.amount) {
-            res.status(403).json({
-                message: "sorry you are not allowed to do this"
+    try {
+        await prisma.$transaction(async tx => {
+            const userResponse = await tx.$queryRaw<{id: string, address: string, usdBalance: number}[]>`SELECT * FROM "User" WHERE id=${userId} FOR UPDATE;`;
+            const user = userResponse[0];
+            if (!user) {
+                throw new Error("User not found");
+            }
+            
+            if (user.usdBalance < data.amount) {
+                throw new Error("Insufficient balance");
+            }
+
+            await tx.user.update({
+                where: {
+                    id: userId
+                },
+                data: {
+                    usdBalance: {
+                        decrement: data.amount
+                    }
+                }
             })
-            return
+
+            await tx.positions.upsert({
+                where: {
+                    userId_marketId_type: {
+                        marketId,
+                        userId,
+                        type: "Yes"
+                    }
+                },
+                create: {
+                    marketId,
+                    userId,
+                    type: "Yes",
+                    qty: data.amount
+                },
+                update: {
+                    qty: {
+                        increment: data.amount
+                    }
+                }
+                
+            })
+
+            await tx.positions.upsert({
+                where: {
+                    userId_marketId_type: {
+                        marketId,
+                        userId,
+                        type: "No"
+                    }
+                },
+                create: {
+                    marketId,
+                    userId,
+                    type: "No",
+                    qty: data.amount
+                },
+                update: {
+                    qty: {
+                        increment: data.amount
+                    }
+                }
+                
+            })
+
+            await tx.orderHistory.create({
+                data: {
+                    orderType: "Split",
+                    userId,
+                    price: 0,
+                    qty: data.amount,
+                    marketId: data.marketId
+                }
+            })
+        })
+        res.status(200).json({
+            message: "Split successful"
+        })
+    } catch (error: any) {
+        console.error("Error splitting:", error);
+        if (error.message === "Insufficient balance") {
+            res.status(403).json({
+                message: "Sorry you are not allowed to do this"
+            })
+        } else {
+            res.status(500).json({
+                message: "Error splitting"
+            })
         }
-
-        await tx.user.update({
-            where: {
-                id: userId
-            },
-            data: {
-                usdBalance: {
-                    decrement: data.amount
-                }
-            }
-        })
-
-        await tx.positions.upsert({
-            where: {
-                userId_marketId_type: {
-                    marketId,
-                    userId,
-                    type: "Yes"
-                }
-            },
-            create: {
-                marketId,
-                userId,
-                type: "Yes",
-                qty: data.amount
-            },
-            update: {
-                qty: {
-                    increment: data.amount
-                }
-            }
-            
-        })
-
-        await tx.positions.upsert({
-            where: {
-                userId_marketId_type: {
-                    marketId,
-                    userId,
-                    type: "No"
-                }
-            },
-            create: {
-                marketId,
-                userId,
-                type: "No",
-                qty: data.amount
-            },
-            update: {
-                qty: {
-                    increment: data.amount
-                }
-            }
-            
-        })
-
-        await tx.orderHistory.create({
-            data: {
-                orderType: "Split",
-                userId,
-                price: 0,
-                qty: data.amount,
-                marketId: data.marketId
-            }
-        })
-    })
+    }
 })
 
 app.post("/merge", middleware, async (req, res) => {

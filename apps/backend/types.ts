@@ -19,9 +19,21 @@ export const SplitSchema = z.object({
 })
 
 export const OnrampSchema = z.object({
-    amount: z.number() // amount in USD (e.g., 100.50)
+    amount: z.number()
+     .refine(val => Number.isFinite(val) && val >= 0, { 
+       message: "Amount must be a non-negative finite number" 
+     })
+     .refine(val => Math.round(val * 100) === val * 100, { 
+       message: "Amount cannot have more than 2 decimal places" 
+     }) // amount in USD (e.g., 100.50)
 })
 
 export const OfframpSchema = z.object({
-    amount: z.number() // amount in USD (e.g., 100.50)
+    amount: z.number()
+    .refine(val => Number.isFinite(val) && val >= 0, { 
+       message: "Amount must be a non-negative finite number" 
+     })
+     .refine(val => Math.round(val * 100) === val * 100, { 
+       message: "Amount cannot have more than 2 decimal places" 
+     }) // amount in USD (e.g., 100.50) 
 })

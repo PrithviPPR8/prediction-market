@@ -18,7 +18,6 @@ model User {
   usdBalance        Int    //$100 => 100_00       $100.11 => 10011  assume a decimal of 2 for fiat balances
   positions         Positions[]
   order             OrderHistory[]
-  @@index([address])
 }
 
 model Market {

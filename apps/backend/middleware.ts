@@ -11,21 +11,21 @@ export async function middleware(req: Request, res: Response, next: NextFunction
         const { data: { user }, error } = await supabase.auth.getUser(token);
         const address: string = user?.user_metadata.custom_claims.address;
 
-        const userDb = await prisma.user.upsert({
-            where: {
-                address,
-
-            },
-            update: {
-                address,
-            },
-            create: {
-                address,
-                usdBalance: 0
-            }
-        })
-
         if(address) {
+            const userDb = await prisma.user.upsert({
+                where: {
+                    address,
+
+                },
+                update: {
+                    address,
+                },
+                create: {
+                    address,
+                    usdBalance: 0
+                }
+            })
+
             req.userId = userDb.id;
             next();
         } else {
