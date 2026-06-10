@@ -4,8 +4,11 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@types/uuid": "^11.0.0",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "uuidv4": "^6.2.13",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -14,11 +14,10 @@ datasource db {
 
 model User {
   id                String      @id   @default(uuid())
-  address           String
+  address           String      @unique
   usdBalance        Int    //$100 => 100_00       $100.11 => 10011  assume a decimal of 2 for fiat balances
   positions         Positions[]
   order             OrderHistory[]
-
 }
 
 model Market {
@@ -41,6 +40,8 @@ model Positions {
   type              PositionType
   user              User        @relation(fields: [userId], references: [id])
   market            Market      @relation(fields: [marketId], references: [id])
+  qty               Int
+  @@unique([userId, marketId, type])
 }
 
 model OrderHistory {
