@@ -19,8 +19,8 @@ declare global {
 
 function App() {
   const [supabase] = useState(createClient(
-    "https://sgvenstbkiedwlmctkym.supabase.co",
-    "sb_publishable_UzrNN841hMRh49RkCtCvbA_5ayRmeRN"
+    "https://yokvffsxhwzrrdbjoxja.supabase.co",
+    "sb_publishable_gB8RnnIOCEJdhzoS10Xblw_0i-WoTDO"
   ));
   return <AppWrapper supabase={supabase} />;
 }
